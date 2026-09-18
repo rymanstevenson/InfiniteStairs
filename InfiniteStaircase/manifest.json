@@ -1,0 +1,10 @@
+{
+  "Name": "Infinite Staircase",
+  "Author": "Ryman",
+  "Version": "1.0.0",
+  "Description": "Adds a craftable Infinite Staircase that instantly creates a ladder down in the mines - and never runs out.",
+  "UniqueID": "Ryman.InfiniteStaircase",
+  "EntryDll": "InfiniteStaircase.dll",
+  "MinimumApiVersion": "4.0.0",
+  "UpdateKeys": []
+}
