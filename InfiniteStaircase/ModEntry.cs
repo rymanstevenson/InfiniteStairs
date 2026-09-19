@@ -44,6 +44,7 @@ namespace InfiniteStaircase
             helper.Events.Input.ButtonPressed += this.OnButtonPressed;
             helper.Events.Content.AssetRequested += this.OnAssetRequested;
             helper.Events.Player.InventoryChanged += this.OnInventoryChanged;
+            helper.Events.Display.RenderedWorld += this.OnRenderedWorld;
         }
 
         /***********
@@ -149,31 +150,9 @@ namespace InfiniteStaircase
             if (Game1.currentLocation is not MineShaft mine)
                 return;
 
-            // resolve the targeted tile:
-            // - for a controller button, always use the tile directly in front of the player (their facing
-            //   direction) - never their own tile. SMAPI's cursor/grab-tile fallback for controllers isn't
-            //   reliable here (e.g. it can be thrown off by a virtual mouse layer like Steam Input's), so we
-            //   compute this ourselves instead
-            // - otherwise (mouse/keyboard), use the exact tile under the cursor
-            bool isController = e.Button == SButton.ControllerX;
-            Vector2 tile;
-            if (isController)
-            {
-                Vector2 direction = Game1.player.FacingDirection switch
-                {
-                    0 => new Vector2(0, -1), // up
-                    1 => new Vector2(1, 0),  // right
-                    2 => new Vector2(0, 1),  // down
-                    3 => new Vector2(-1, 0), // left
-                    _ => Vector2.Zero
-                };
-
-                tile = Game1.player.Tile + direction;
-            }
-            else
-            {
-                tile = e.Cursor.GrabTile;
-            }
+            // resolve the targeted tile - see GetTargetTile() for why, and this must match OnRenderedWorld
+            // exactly so the preview never disagrees with where the ladder actually gets placed
+            Vector2 tile = GetTargetTile();
 
             if (mine.shouldCreateLadderOnThisLevel() && IsValidLadderTile(mine, tile))
             {
@@ -198,6 +177,61 @@ namespace InfiniteStaircase
             // ground, but not diggable)
             string? backTileType = mine.doesTileHaveProperty((int)tile.X, (int)tile.Y, "Type", "Back");
             return "Stone".Equals(backTileType);
+        }
+
+        /// <summary>Get the tile the player is currently targeting for placement. Mirrors the same device
+        /// detection the game itself uses for placing things (e.g. chests, fences, seeds) - <see
+        /// cref="Game1.IsPerformingMousePlacement"/> - but, unlike the game's own <see
+        /// cref="Game1.GetPlacementGrabTile"/>, never falls back to <see cref="Character.GetGrabTile"/> for
+        /// controller/keyboard input: that method is a loose "interact range" hit-test which, depending on the
+        /// player's exact sub-tile pixel position, can resolve to the player's own tile instead of the tile
+        /// they're facing. We need the latter guaranteed, so we compute it ourselves as the player's tile plus
+        /// a one-tile offset in their facing direction.</summary>
+        private static Vector2 GetTargetTile()
+        {
+            if (Game1.IsPerformingMousePlacement())
+                return Game1.GetPlacementGrabTile();
+
+            return Game1.player.Tile + GetFacingDirectionOffset();
+        }
+
+        /// <summary>Get a one-tile offset in the direction the player is currently facing.</summary>
+        private static Vector2 GetFacingDirectionOffset()
+        {
+            return Game1.player.FacingDirection switch
+            {
+                0 => new Vector2(0, -1), // up
+                1 => new Vector2(1, 0),  // right
+                2 => new Vector2(0, 1),  // down
+                3 => new Vector2(-1, 0), // left
+                _ => Vector2.Zero
+            };
+        }
+
+        /// <summary>Raised after the game draws to the world, letting us draw over it. Used to show a green/red
+        /// tile preview - like the vanilla placement preview - for where the ladder would be created.</summary>
+        /// <param name="sender">The event sender.</param>
+        /// <param name="e">The event data.</param>
+        private void OnRenderedWorld(object? sender, RenderedWorldEventArgs e)
+        {
+            if (!Context.IsWorldReady)
+                return;
+
+            if (Game1.player.CurrentTool?.QualifiedItemId != ToolQualifiedId)
+                return;
+
+            if (Game1.currentLocation is not MineShaft mine)
+                return;
+
+            // resolve the targeted tile - see GetTargetTile() for why, and this must match OnButtonPressed
+            // exactly so the preview never disagrees with where the ladder actually gets placed
+            Vector2 tile = GetTargetTile();
+
+            bool valid = mine.shouldCreateLadderOnThisLevel() && IsValidLadderTile(mine, tile);
+            Color color = (valid ? Color.Green : Color.Red) * 0.5f;
+
+            Vector2 screenPos = Game1.GlobalToLocal(Game1.viewport, tile * 64f);
+            e.SpriteBatch.Draw(Game1.staminaRect, new Rectangle((int)screenPos.X, (int)screenPos.Y, 64, 64), color);
         }
     }
 }
