@@ -42,6 +42,15 @@ InfiniteStaircase/
   assets/               # sprite(s) used by the mod
 ```
 
+## Changelog
+
+### 1.0.0
+- Initial release.
+- Adds a craftable Infinite Staircase tool: 10 Staircases + Mining level 5.
+- Instantly creates a ladder down on the current mine level - never runs out.
+- Shows a green/red tile preview (like vanilla placement tools) for where the ladder will be created.
+- Full controller support - targets the tile you're facing, matching the preview exactly.
+
 ## Credits
 
 - Built with [SMAPI](https://smapi.io/) by Pathoschild.
